@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# the location of our virtual environment
+VIRTUAL_ENV=/home/smsrelay/smsrelay/env
+
+# our pid file location
+PIDFILE="/home/smsrelay/smsrelay.pid"
+
+# the name (and arguments) of the process we want to turn into a daemon
+DAEMON="/home/smsrelay/smsrelay/smsrelay.py"
+ARGS="--incoming=/var/spool/sms/incoming/ --outgoing=/var/spool/sms/outgoing/ --server=192.168.0.101:8000 --backend=mtn --log=/var/log/smsrelay/smsrelay.log"
+
+# a pretty name for our process 
+NAME=sms-relay
+
+case "$1" in
+  start)
+    echo "Starting $NAME.."
+
+    # Activate the virtual environment
+    . $VIRTUAL_ENV/bin/activate
+
+    # Run start-stop-daemon, the $DAEMON variable contains the path to the
+    # application to run
+    start-stop-daemon --start \
+	--pidfile $PIDFILE --make-pidfile \
+        --user smsrelay --group smsrelay \
+        --chuid smsrelay \
+	--background \
+        --exec $DAEMON \
+        -- $ARGS
+
+    echo "Started."
+    ;;
+  stop)
+    echo "Stopping $NAME.."
+
+    # Start-stop daemon can also stop the application by sending sig 15
+    # (configurable) to the process id contained in the run/pid file
+    start-stop-daemon --stop --verbose --pidfile $PIDFILE
+    echo "Stopped."
+    ;;
+  *)
+    # Refuse to do other stuff
+    echo "Usage: /etc/init.d/$NAME {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0
