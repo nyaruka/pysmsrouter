@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+ 
 import os
 import time
 import re
@@ -19,10 +19,13 @@ class Relayer(object):
 
         self.incoming = incoming
         self.outgoing = outgoing
-        self.incoming_url = 'http://%s/' % server + 'sms/%s/receive/'
-        self.outgoing_url = 'http://%s/' % server + 'sms/%s/outbox/'
+        self.incoming_url = 'http://%s/' % server + 'backends/%s/receive/?'
+        self.outgoing_url = 'http://%s/' % server + 'backends/%s/outbox/'
+        self.delivery_url = 'http://%s/' % server + 'backends/%s/delivered/?'
         self.log = log
         self.backends = (backend,)
+        self.ignore_list = set()
+        self.sent_list = set()
 
     def start_logger(self):
         logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s",
@@ -51,15 +54,29 @@ class Relayer(object):
                 message = files.pop()
                 file = os.path.basename(message)
 
+                if file in self.ignore_list:
+                    continue
+
                 try:
                     self.handle_incoming(message)
-                    os.unlink(message)
+
+                    try:
+                        os.unlink(message)
+                    except Exception as e:
+                        # we couldn't remove the message, tell as much, and add this message to our ignore list
+                        logging.error("INCOMING - %s : Unable to unlink file." % file)
+                        self.ignore_list.add(file)
+                        continue
 
                     # we break out when we succesfully handle a message
                     break
                 except Exception as e:
                     error = getattr(e, 'reason', str(e))
                     logging.error("INCOMING - %s : %s" % (file, error))
+
+
+
+
 
             # now do outgoing
             try:
@@ -109,7 +126,7 @@ class Relayer(object):
 
         logging.info("INCOMING - %s : %s : %s : %s" % (file, backend, sender, body))
 
-        url = "%s?%s" % (self.incoming_url % backend, urlencode(params))
+        url = "%s%s" % (self.incoming_url % backend, urlencode(params))
         response = urlopen(url)
         response_body = response.read()
         if response.getcode() != 200:
@@ -124,7 +141,7 @@ class Relayer(object):
             try:
                 response_body = None
                 response = urlopen(url)
-                if response.getcode() != '200':
+                if response.getcode() == 200:
                     response_body = response.read()
 
                     # parse it
@@ -132,11 +149,28 @@ class Relayer(object):
 
                     # add each message to our outgoing queue
                     for message in messages:
+                        if message['id'] in self.sent_list:
+                            continue
+
+                        logging.info("OUTGOING - %s : %s : %s" % (backend, message['recipient'], message['message']))
+
                         f = NamedTemporaryFile(delete=False, prefix="%s." % backend, dir=self.outgoing)
                         f.write("To: %s\n" % message['recipient'])
                         f.write("Modem: %s\n" % backend)
                         f.write("\n%s" % message['message'])
                         f.close()
+
+                        # mark it as delivered
+                        try:
+                            params = { 'id': message['id'] }
+                            url = self.delivery_url % backend + urlencode(params)
+                            r = urlopen(url)
+                            if r.getcode() != 200:
+                                logging.error("OUTGOING - %s : Unable to mark message as delivered, got status: %s" % (message['id'], r.getcode()))
+                                self.sent_list.add(message['id'])
+                        except Exception as e:
+                            self.sent_list.add(message['id'])
+                            logging.error("OUTGOING - %s : Unable to mark message as delivered: %s" % (message['id'], str(e)))
 
                 else:
                     raise Exception("Got error (%d) from router: %s" % (response.getcode(), response_body))

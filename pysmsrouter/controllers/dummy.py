@@ -36,7 +36,7 @@ class Message():
                     created=self.created.isoformat())
 
 class ReceiveJob():
-    def __init__(self, controller, message):
+    def __init__(self, message):
         self.message = message
 
     def work(self, controller):
@@ -65,7 +65,7 @@ class DeliveredJob():
         
         params = {
             'backend': msg.backend,
-            'id': msg.id
+            'message_id': msg.id
         }
 
         response = urlopen(controller.delivered_url + urlencode(params))
@@ -126,21 +126,21 @@ class DummyController():
             thread.daemon = True
             thread.start()
 
-    def add_incoming_message(self, backend_id, sender, recipient, message):
-        message = self.create_message(backend_id, sender, recipient, message, 'IN')
-        self.jobs.put(ReceiveJob(self, self.server, message))
+    def add_incoming_message(self, backend_id, sender, recipient, text):
+        message = self.create_message(backend_id, sender, recipient, text, 'IN')
+        self.jobs.put(ReceiveJob(message))
         return message
 
-    def add_outgoing_message(self, backend_id, sender, recipient, message):
+    def add_outgoing_message(self, backend_id, sender, recipient, text):
         if backend_id not in self.backends:
             raise Exception("Unknown backend '%s'" % backend_id)
 
-        message = self.create_message(backend_id, sender, recipient, message, 'IN')
+        message = self.create_message(backend_id, sender, recipient, text, 'IN')
         self.backends[backend_id].send(message)
         return message
 
     def mark_message_delivered(self, message):
-        self.add_job(DeliveredJob(self, message))
+        self.add_job(DeliveredJob(message))
 
     def create_message(self, backend_id, sender, recipient, message, direction):
         message = Message(backend=backend_id, 

@@ -2,6 +2,8 @@ import cherrypy
 from cherrypy import HTTPError
 import ConfigParser
 import json
+from urllib2 import urlopen
+from urllib import urlencode
 
 class Server:
 
@@ -32,13 +34,18 @@ class Server:
         # start our controller
         self.controller.start()
 
+        config = { 'global': { 'server.socket_host': '0.0.0.0' } }
+
         # and start cherry py
-        cherrypy.quickstart(self)
+        cherrypy.quickstart(self, config=config)
 
     @cherrypy.expose
-    def send(self, id=None, backend=None, sender=None, recipient=None, message=None):
-        if backend and recipient and sender and message:
-            message = self.controller.add_outgoing_message(backend, sender, recipient, message)
+    def send(self, id=None, backend=None, recipient=None, text=None):
+        if backend and recipient and text:
+            message = self.controller.add_outgoing_message(backend, backend, recipient, text)
+
+            # set the id if we were given one
+            if id: message.id = id
             return json.dumps(message.as_json())
         else:
             raise HTTPError(400, 

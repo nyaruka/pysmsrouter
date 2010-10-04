@@ -1,4 +1,4 @@
-#!/bin/bash
+#! /bin/bash
 
 # the location of our virtual environment
 VIRTUAL_ENV=/home/smsrelay/smsrelay/env
@@ -8,7 +8,7 @@ PIDFILE="/home/smsrelay/smsrelay.pid"
 
 # the name (and arguments) of the process we want to turn into a daemon
 DAEMON="/home/smsrelay/smsrelay/smsrelay.py"
-ARGS="--incoming=/var/spool/sms/incoming/ --outgoing=/var/spool/sms/outgoing/ --server=192.168.0.101:8000 --backend=mtn --log=/var/log/smsrelay/smsrelay.log"
+ARGS="--incoming=/var/spool/sms/incoming/ --outgoing=/var/spool/sms/outgoing/ --server=192.168.0.101:8080 --backend=mtn --log=/var/log/smsrelay/smsrelay.log"
 
 # a pretty name for our process 
 NAME=sms-relay
