@@ -30,11 +30,16 @@ class Server:
         # add our 'backends' controller
         self.backends = Backends(self.controller.backends)
 
+        # save our configuration
+        self.conf = conf
+
     def start(self):
         # start our controller
         self.controller.start()
+        
+        port = int(self.conf.get("main", "port"))
 
-        config = { 'global': { 'server.socket_host': '0.0.0.0' } }
+        config = { 'global': { 'server.socket_host': '0.0.0.0', 'server.socket_port':  port } }
 
         # and start cherry py
         cherrypy.quickstart(self, config=config)
