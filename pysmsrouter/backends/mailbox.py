@@ -27,6 +27,12 @@ class Mailbox(Backend):
         Called when someone wants to send a message off.  We add the message as an outgoing
         message.
         """
+        # check to see if this message already exists
+        for existing in self.queue:
+            if existing.id == message.id:
+                return
+
+        # not already there?  append it
         self.queue.append(message)
         return message
 

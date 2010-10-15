@@ -177,7 +177,7 @@ class DummyController():
     def mark_message_delivered(self, message):
         self.add_job(DeliveredJob(message))
 
-    def create_message(self, backend_id, sender, recipient, message, direction):
+    def create_message(self, backend_id, sender, recipient, message, direction, id=None):
         message = Message(backend=backend_id, 
                           sender=sender, 
                           recipient=recipient, 
