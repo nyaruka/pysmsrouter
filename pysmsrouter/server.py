@@ -47,10 +47,7 @@ class Server:
     @cherrypy.expose
     def send(self, id=None, backend=None, recipient=None, text=None):
         if backend and recipient and text:
-            message = self.controller.add_outgoing_message(backend, backend, recipient, text)
-
-            # set the id if we were given one
-            if id: message.id = id
+            message = self.controller.add_outgoing_message(backend, backend, recipient, text, id=id)
             return json.dumps(message.as_json())
         else:
             raise HTTPError(400, 

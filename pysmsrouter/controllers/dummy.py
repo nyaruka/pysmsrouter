@@ -6,6 +6,7 @@ from threading import Thread
 from urllib2 import urlopen
 from urllib import urlencode
 import time
+import json
 
 class Message():
     """
@@ -14,7 +15,7 @@ class Message():
     """
 
     def __init__(self, backend=None, sender=None, recipient=None, message=None, 
-                 direction=None, sent=None):
+                 direction=None, sent=None, id=None):
         self.backend = backend
         self.sender = sender
         self.recipient = recipient
@@ -23,7 +24,10 @@ class Message():
         self.sent = sent
         self.created = datetime.now()
 
-        self.id = str(uuid.uuid1())
+        if not id:
+            self.id = str(uuid.uuid1())
+        else:
+            self.id = id
 
     def as_json(self):
         return dict(id=self.id,
@@ -93,6 +97,8 @@ class DummyController():
         self.receive_url = config.get("main", "receive_url")
         self.delivered_url = config.get("main", "delivered_url")
 
+        self.outbox_url = config.get("main", "outbox_url")
+
         self.backends = {}
         self.config = config
 
@@ -102,7 +108,7 @@ class DummyController():
             
     def start(self):
         """
-        Starts the controller.  In our case we spawm all our worker threads.
+        Starts the controller.  In our case we spawn all our worker threads.
         """
         # start all our backends
         for backend in self.backends:
@@ -120,22 +126,51 @@ class DummyController():
                     self.jobs.put(job)
 
                 self.jobs.task_done()
-        
+
+
+        # checks our outbox over and over for new messages to send out
+        def check_outbox():
+            while True:
+                try:
+                    response = urlopen(self.outbox_url)
+                    if response.getcode() == 200:
+                        content = json.loads(response.read())
+                        # for each message in our outbox
+                        for message in content['outbox']:
+                            # add it to our outgoing queue
+                            self.add_outgoing_message(message['backend'],
+                                                      None,
+                                                      message['contact'],
+                                                      message['text'],
+                                                      id=message['id'])
+                            
+                    else:
+                        raise Exception("Unable to send message, got status: %s" % response.getcode())
+                except Exception, e:
+                    print "Error checking outbox: %s" % e
+
+                time.sleep(5)
+
         for i in range(self.threads):
             thread = Thread(target=do_work)
             thread.daemon = True
             thread.start()
+
+        # start our thread for our outbox
+        thread = Thread(target=check_outbox)
+        thread.daemon = True
+        thread.start()
 
     def add_incoming_message(self, backend_id, sender, recipient, text):
         message = self.create_message(backend_id, sender, recipient, text, 'IN')
         self.jobs.put(ReceiveJob(message))
         return message
 
-    def add_outgoing_message(self, backend_id, sender, recipient, text):
+    def add_outgoing_message(self, backend_id, sender, recipient, text, id=None):
         if backend_id not in self.backends:
             raise Exception("Unknown backend '%s'" % backend_id)
 
-        message = self.create_message(backend_id, sender, recipient, text, 'IN')
+        message = self.create_message(backend_id, sender, recipient, text, 'OUT', id)
         self.backends[backend_id].send(message)
         return message
 
@@ -147,7 +182,8 @@ class DummyController():
                           sender=sender, 
                           recipient=recipient, 
                           message=message, 
-                          direction=direction)
+                          direction=direction, 
+                          id=id)
         return message
 
     def add_job(self, job):
