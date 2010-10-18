@@ -58,8 +58,7 @@ class Mailbox(Backend):
         if id:
             for i in range(len(self.queue)):
                 message = self.queue[i]
-                print "%s == %s (%s)" % (message.id, id, str(str(message.id) == str(id)))
-                if message.id == id:
+                if str(message.id) == str(id):
                     message = self.queue[i]
                     self.queue.remove(message)
                     self.controller.mark_message_delivered(message)
