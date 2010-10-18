@@ -168,7 +168,8 @@ class DummyController():
 
     def add_outgoing_message(self, backend_id, sender, recipient, text, id=None):
         if backend_id not in self.backends:
-            raise Exception("Unknown backend '%s'" % backend_id)
+            print "Unknown backend '%s', ignoring." % backend_id
+            return
 
         message = self.create_message(backend_id, sender, recipient, text, 'OUT', id)
         self.backends[backend_id].send(message)
