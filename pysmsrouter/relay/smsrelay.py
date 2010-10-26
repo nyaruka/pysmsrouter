@@ -11,6 +11,20 @@ from tempfile import NamedTemporaryFile
 import logging
 import getopt
 import sys
+import signal
+import threading
+import traceback
+
+def dumpstacks(signal, frame):
+    logging.error("Dumping stack")
+    id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
+    code = []
+    for threadId, stack in sys._current_frames().items():
+        logging.error("\n# Thread: %s(%d)" % (id2name[threadId], threadId))
+        for filename, lineno, name, line in traceback.extract_stack(stack):
+            logging.error('File: "%s", line %d, in %s' % (filename, lineno, name))
+            if line:
+                logging.error("  %s" % (line.strip()))
 
 class Relayer(object):
 
@@ -26,6 +40,7 @@ class Relayer(object):
         self.backends = (backend,)
         self.ignore_list = set()
         self.sent_list = set()
+        signal.signal(signal.SIGQUIT, dumpstacks)
 
     def start_logger(self):
         logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s",
@@ -127,7 +142,7 @@ class Relayer(object):
         logging.info("INCOMING - %s : %s : %s : %s" % (file, backend, sender, body))
 
         url = "%s%s" % (self.incoming_url % backend, urlencode(params))
-        response = urlopen(url)
+        response = urlopen(url, None, 5)
         response_body = response.read()
         if response.getcode() != 200:
             raise Exception("Error delivering message to router: %s" % response_body)
@@ -140,7 +155,7 @@ class Relayer(object):
 
             try:
                 response_body = None
-                response = urlopen(url)
+                response = urlopen(url, None, 5)
                 if response.getcode() == 200:
                     response_body = response.read()
 
@@ -164,7 +179,7 @@ class Relayer(object):
                         try:
                             params = { 'id': message['id'] }
                             url = self.delivery_url % backend + urlencode(params)
-                            r = urlopen(url)
+                            r = urlopen(url, None, 5)
                             if r.getcode() != 200:
                                 logging.error("OUTGOING - %s : Unable to mark message as delivered, got status: %s" % (message['id'], r.getcode()))
                                 self.sent_list.add(message['id'])
