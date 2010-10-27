@@ -11,7 +11,7 @@ class Yo(Backend):
     STATUS = 'ybs_autocreate_status'
     ERROR = 'ybs_autocreate_message'
 
-    def configure(name, controller, config):
+    def register(self, name, controller, config):
         if config.has_option(name, 'endpoint'):
             self.path = config.get(name, 'endpoint')
         else:
@@ -27,6 +27,8 @@ class Yo(Backend):
             self.backup_url = None
 
         self.controller = controller
+
+        controller.register_backend(name, self)
 
     def start(self):
         pass

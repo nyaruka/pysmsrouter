@@ -14,10 +14,12 @@ class Mailbox(Backend):
     outgoing messages
     """
 
-    def configure(self, name, controller, config):
+    def register(self, name, controller, config):
         self.name = name
         self.controller = controller
         self.queue = []
+
+        controller.register_backend(name, self)
 
     def start(self):
         pass

@@ -102,17 +102,16 @@ class DummyController():
         self.backends = {}
         self.config = config
 
-    def add_backend(self, name, backend):
+    def register_backend(self, name, backend):
         self.backends[name] = backend
-        backend.configure(name, self, self.config)
             
     def start(self):
         """
         Starts the controller.  In our case we spawn all our worker threads.
         """
         # start all our backends
-        for backend in self.backends:
-            self.backends[backend].start()
+        for backend in set(self.backends.values()):
+            backend.start()
 
         # fire off our workers
         def do_work():
@@ -149,7 +148,7 @@ class DummyController():
                 except Exception, e:
                     print "Error checking outbox: %s" % e
 
-                time.sleep(5)
+                time.sleep(2)
 
         for i in range(self.threads):
             thread = Thread(target=do_work)
@@ -168,7 +167,7 @@ class DummyController():
 
     def add_outgoing_message(self, backend_id, sender, recipient, text, id=None):
         if backend_id not in self.backends:
-            print "Unknown backend '%s', ignoring." % backend_id
+            #print "Unknown backend '%s', ignoring." % backend_id
             return
 
         message = self.create_message(backend_id, sender, recipient, text, 'OUT', id)
