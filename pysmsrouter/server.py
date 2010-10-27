@@ -24,8 +24,7 @@ class Server:
         for backend_name in backend_names:
             backend_type = conf.get(backend_name, "type")
             backend = get_class(backend_type)()
-
-            self.controller.add_backend(backend_name, backend)
+            backend.register(backend_name, self.controller, conf)
 
         # add our 'backends' controller
         self.backends = Backends(self.controller.backends)
