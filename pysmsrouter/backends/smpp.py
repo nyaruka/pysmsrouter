@@ -115,7 +115,7 @@ class Client(object):
                             while self.messages:
                                 message = self.messages[0]
 
-                                print "sending message"
+                                print "sending message: %s" % (str(message.id))
                                 print "  from: %s" % message.sender
                                 print "    to: %s" % message.recipient
                                 print "   txt: %s" % message.message
