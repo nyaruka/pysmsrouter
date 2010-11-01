@@ -4,9 +4,10 @@ from urllib2 import urlopen
 from urllib import urlencode
 import cgi
 from .backend import Backend
-import cherrypy
-from cherrypy import HTTPError
 import json
+import cherrypy
+import json
+import pylru
 
 class Mailbox(Backend):
     """
@@ -37,20 +38,6 @@ class Mailbox(Backend):
         # not already there?  append it
         self.queue.append(message)
         return message
-
-    @cherrypy.expose
-    def receive(self, sender=None, message=None):
-        """
-        Called when a message is received, we add it as an incoming message.
-        """
-        if sender and message:
-            message = self.controller.add_incoming_message(self.name,
-                                                           sender,
-                                                           self.name,
-                                                           message)
-            return json.dumps(message.as_json())
-        else:
-            raise HTTPError(400, "Required format: receive?sender=<sender>&message=<msg>")
 
     @cherrypy.expose
     def delivered(self, id=None):

@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import json
 from urllib2 import urlopen
 from urllib import urlencode
 import cgi
@@ -36,6 +37,19 @@ class Smpp(Backend):
         message.sender = self.number
         self.smpp.add_outgoing(message)
 
+    @cherrypy.expose
+    def receive(self, sender=None, message=None):
+        """
+        Called when a message is received, we add it as an incoming message.
+        """
+        if sender and message:
+            message = self.controller.add_incoming_message(self.name,
+                                                           sender,
+                                                           self.name,
+                                                           message)
+            return json.dumps(message.as_json())
+        else:
+            raise HTTPError(400, "Required format: receive?sender=<sender>&message=<msg>")
 
 # global map of smpp clients, shared across various SMPP backends
 _smpp_clients = {}
@@ -83,12 +97,17 @@ class Client(object):
 
     def start(self):
         try:
+            self.lock.acquire()
+
             # already created?  exit
-            if self.client: return
+            if self.client: 
+                print "not starting %s, already started" % self.host
+                return
 
             # otherwise, lock, then create our client
-            self.lock.acquire()
             if not self.client:
+                print "starting %s" % self.host
+
                 self.client = smpplib.client.Client(self.host, self.port)
 
                 # connect
