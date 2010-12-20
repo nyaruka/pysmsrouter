@@ -7,14 +7,12 @@ from .backend import Backend
 import json
 import cherrypy
 import json
-import pylru
 
 class Mailbox(Backend):
     """
     The relay backend just acts as a relay for some other backend.  It's purpose is to queue
     outgoing messages
     """
-
     def register(self, name, controller, config):
         self.name = name
         self.controller = controller

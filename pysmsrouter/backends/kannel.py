@@ -25,7 +25,7 @@ class Kannel(Backend):
 
         controller.register_backend(name, self)
 
-        self.seen = pylru.lrucache(100)
+        self.seen = pylru.lrucache(10000)
 
     def start(self):
         pass
@@ -65,7 +65,7 @@ class SendJob():
             'text': self.message.message,
             'to': self.message.recipient
             }
-        
+
         response = urlopen(self.backend.url + urlencode(params), timeout=15)
             
         # if we got a 200 back, read the response

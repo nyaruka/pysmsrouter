@@ -8,8 +8,12 @@ class Backend():
         self.name = name
         controller.register_backend(name, self)
 
-    def send(self, sender, recipient, message):
+    def send(self, message):
         raise Exception("This backend does not support sending messages.")
+
+    def start(self):
+        # no-op by default
+        pass
 
     @cherrypy.expose
     def receive(self, sender=None, message=None):

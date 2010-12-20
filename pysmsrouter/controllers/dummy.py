@@ -7,6 +7,8 @@ from urllib2 import urlopen
 from urllib import urlencode
 import time
 import json
+import sys
+import traceback
 from threading import Lock
 
 class Message():
@@ -102,7 +104,7 @@ class DummyController():
 
     def configure(self, config):
         if config.has_option("main", "threads"):
-            self.threads = config.get("main", "threads")
+            self.threads = int(config.get("main", "threads"))
         else:
             self.threads = 1
 
@@ -123,6 +125,25 @@ class DummyController():
 
     def get_recent_messages(self):
         return list(self.out)
+
+    def check_outbox(self):
+        """
+        Checks our outbox URL to see if there are any messages to send.
+        """
+        response = urlopen(self.outbox_url)
+        if response.getcode() == 200:
+            content = json.loads(response.read())
+            # for each message in our outbox
+            for message in content['outbox']:
+                # add it to our outgoing queue
+                self.add_outgoing_message(message['backend'],
+                                          None,
+                                          message['contact'],
+                                          message['text'],
+                                          id=message['id'])
+                
+        else:
+            raise Exception("Unable to send message, got status: %s" % response.getcode())
             
     def start(self):
         """
@@ -138,44 +159,32 @@ class DummyController():
                 job = self.jobs.get()
                 try:
                     job.work(self)
-                except Exception, e:
-                    print "Error running job: %s" % e
+                except:
+                    print "Error running job: %s" % sys.exc_info()[1]
+                    traceback.print_exc()
                     time.sleep(1)
                     self.jobs.put(job)
 
                 self.jobs.task_done()
 
 
-        # checks our outbox over and over for new messages to send out
-        def check_outbox():
-            while True:
-                try:
-                    response = urlopen(self.outbox_url)
-                    if response.getcode() == 200:
-                        content = json.loads(response.read())
-                        # for each message in our outbox
-                        for message in content['outbox']:
-                            # add it to our outgoing queue
-                            self.add_outgoing_message(message['backend'],
-                                                      None,
-                                                      message['contact'],
-                                                      message['text'],
-                                                      id=message['id'])
-                            
-                    else:
-                        raise Exception("Unable to send message, got status: %s" % response.getcode())
-                except Exception, e:
-                    print "Error checking outbox: %s" % e
-
-                time.sleep(2)
-
         for i in range(self.threads):
             thread = Thread(target=do_work)
             thread.daemon = True
             thread.start()
 
+        # closure for our outbox checking in an infinite loop
+        def check_outbox_loop():
+            while True:
+                try:
+                    self.check_outbox()
+                except Exception, e:
+                    print "Error checking outbox: %s" % e
+
+                time.sleep(2)
+
         # start our thread for our outbox
-        thread = Thread(target=check_outbox)
+        thread = Thread(target=check_outbox_loop)
         thread.daemon = True
         thread.start()
 
@@ -203,8 +212,8 @@ class DummyController():
                 # if not, add it to our locked queue
                 self.out.append(message)
 
-                # keep it to 100 items
-                if len(self.out) > 100:
+                # keep it to 10,000 items or less
+                if len(self.out) > 10000:
                     self.out.pop(0)
 
             finally:
