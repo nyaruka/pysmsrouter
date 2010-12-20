@@ -27,7 +27,7 @@ class Server:
             backend.register(backend_name, self.controller, conf)
 
         # add our 'backends' controller
-        self.backends = Backends(self.controller.backends)
+        self.backends = Backends(self.controller)
 
         # save our configuration
         self.conf = conf
@@ -57,19 +57,37 @@ class Server:
         return "SMS Router"
 
 class Backends():
-    def __init__(self, backends):
-        self.backends = backends
+    def __init__(self, controller):
+        self.controller = controller
+        self.backends = controller.backends
 
         # add each backend to our dict, this exposes each as /backends/<backend name>
         for key in self.backends:
-            self.__dict__[key] = backends[key]
+            self.__dict__[key] = self.backends[key]
 
     @cherrypy.expose
     def index(self):
-        html = "<html><body><ul>"
+        html = "<html><body><h2>backends</h2><ul>"
         for backend in self.backends:
             html += "<li>" + str(backend) + "</li>"
-        html += "</li></body></html>"
+        html += "</ul>"
+
+        messages = self.controller.get_recent_messages()
+        messages.sort(key=lambda msg: msg.created)
+        messages.reverse()
+
+        html += "<h2>recent outgoing messages</h2>"
+        html += "<table width='100%' border='1'><thead><tr><th>backend</th><th>time</th><th>recipient</th><th>message</th></tr></thead>"
+        for message in messages:
+            html += "<tr>"
+            html += "<td width=100>" + message.backend + "</td>"
+            html += "<td width=100>" + str(message.created) + "</td>"
+            html += "<td width=100>" + message.recipient + "</td>"
+            html += "<td><code>" + message.message + "</code></td>"
+            html += "</td>"
+        html += "</table>"
+
+        html += "</body></html>"
         return html
 
 def get_class(kls):

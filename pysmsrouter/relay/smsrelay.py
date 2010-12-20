@@ -34,8 +34,12 @@ class Relayer(object):
         self.incoming = incoming
         self.outgoing = outgoing
         self.incoming_url = 'http://%s/' % server + 'backends/%s/receive/?'
-        self.outgoing_url = 'http://%s/' % server + 'backends/%s/outbox/'
-        self.delivery_url = 'http://%s/' % server + 'backends/%s/delivered/?'
+        if outgoing:
+            self.outgoing_url = 'http://%s/' % server + 'backends/%s/outbox/'
+            self.delivery_url = 'http://%s/' % server + 'backends/%s/delivered/?'
+        else:
+            self.outgoing_url = None
+            self.delivery_url = None
         self.log = log
         self.backends = (backend,)
         self.ignore_list = set()
@@ -88,10 +92,6 @@ class Relayer(object):
                 except Exception as e:
                     error = getattr(e, 'reason', str(e))
                     logging.error("INCOMING - %s : %s" % (file, error))
-
-
-
-
 
             # now do outgoing
             try:
@@ -151,6 +151,10 @@ class Relayer(object):
 
     def handle_outgoing(self):
         for backend in self.backends:
+            # skip over outgoing if we don't have one
+            if not self.outgoing_url:
+                return
+
             url = self.outgoing_url % backend
 
             try:
@@ -209,7 +213,7 @@ def main(args):
         usage()
         sys.exit(2)
 
-    if len(opts) != 5:
+    if len(opts) < 4:
         usage()
         sys.exit(2)
 

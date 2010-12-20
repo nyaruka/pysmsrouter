@@ -7,6 +7,7 @@ from urllib2 import urlopen
 from urllib import urlencode
 import time
 import json
+from threading import Lock
 
 class Message():
     """
@@ -55,10 +56,21 @@ class ReceiveJob():
         response = urlopen(controller.receive_url + urlencode(params))
 
         if response.getcode() == 200:
-            print "message: %s sent" % msg.id
+            body = response.read()
+            response = json.loads(body)
+
+            # are there responses to send?
+            if 'responses' in response:
+                for message in response['responses']:
+                    # add it to our outgoing queue
+                    controller.add_outgoing_message(message['backend'],
+                                                    None,
+                                                    message['contact'],
+                                                    message['text'],
+                                                    id=message['id'])
+
         else:
             raise Exception("Unable to send message, got status: %s" % response.getcode())
-
 
 class DeliveredJob():
     def __init__(self, message):
@@ -102,8 +114,15 @@ class DummyController():
         self.backends = {}
         self.config = config
 
+        # latest messages that have been sent
+        self.out = []
+        self.out_lock = Lock()
+
     def register_backend(self, name, backend):
         self.backends[name] = backend
+
+    def get_recent_messages(self):
+        return list(self.out)
             
     def start(self):
         """
@@ -167,10 +186,30 @@ class DummyController():
 
     def add_outgoing_message(self, backend_id, sender, recipient, text, id=None):
         if backend_id not in self.backends:
-            #print "Unknown backend '%s', ignoring." % backend_id
             return
 
         message = self.create_message(backend_id, sender, recipient, text, 'OUT', id)
+
+        # if we have an id, see if we've already seen this message
+        if id:
+            try:
+                self.out_lock.acquire()
+
+                # check to see if we've already seen this item
+                for out in self.out:
+                    if str(out.id) == str(message.id):
+                        return
+
+                # if not, add it to our locked queue
+                self.out.append(message)
+
+                # keep it to 100 items
+                if len(self.out) > 100:
+                    self.out.pop(0)
+
+            finally:
+                self.out_lock.release()
+
         self.backends[backend_id].send(message)
         return message
 
